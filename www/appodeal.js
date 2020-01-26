@@ -11,8 +11,8 @@ Appodeal.BANNER_TOP = 16;
 Appodeal.REWARDED_VIDEO = 128;
 Appodeal.NON_SKIPPABLE_VIDEO = 256;
 
-Appodeal.initialize = function(appKey, adType) {
-    exec(null, null, "AppodealPlugin", "initialize", [appKey, adType]);
+Appodeal.initialize = function(appKey, adType, consent) {
+    exec(null, null, "AppodealPlugin", "initialize", [appKey, adType, consent]);
 };
 
 Appodeal.isInitialized = function(callback) {
