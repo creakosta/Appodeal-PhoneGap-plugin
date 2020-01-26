@@ -6,6 +6,7 @@ import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
 
+import android.provider.Settings;
 import android.widget.LinearLayout;
 import android.widget.FrameLayout;
 import android.view.ViewGroup;
@@ -19,11 +20,13 @@ import com.appodeal.ads.NonSkippableVideoCallbacks;
 import com.appodeal.ads.UserSettings;
 import com.appodeal.ads.BannerView;
 import com.appodeal.ads.utils.Log;
-import com.appodeal.unity.AppodealUnityBannerView;
+// import com.appodeal.unity.AppodealUnityBannerView;
 
 import org.json.JSONObject;
 
 public class AppodealPlugin extends CordovaPlugin {
+
+    private static final String TAG = "com.appodeal.plugin";
 
     private static final String ACTION_IS_INITIALIZED = "isInitalized";
 
@@ -35,7 +38,7 @@ public class AppodealPlugin extends CordovaPlugin {
     private static final String ACTION_IS_LOADED = "isLoaded";
     private static final String ACTION_CACHE = "cache";
     private static final String ACTION_HIDE = "hide";
-	private static final String ACTION_DESTROY = "destroy";
+    private static final String ACTION_DESTROY = "destroy";
     private static final String ACTION_SET_AUTO_CACHE = "setAutoCache";
     private static final String ACTION_IS_PRECACHE = "isPrecache";
 
@@ -66,6 +69,9 @@ public class AppodealPlugin extends CordovaPlugin {
     private static final String ACTION_SET_CUSTOM_STRING_RULE = "setCustomStringRule";
     private static final String ACTION_GET_REWARD_PARAMETERS = "getRewardParameters";
     private static final String ACTION_GET_REWARD_PARAMETERS_FOR_PLACEMENT = "getRewardParametersForPlacement";
+    private static final String ACTION_SET_SEGMENT_FILTER = "setSegmentFilter";
+    private static final String ACTION_SET_EXTRA_DATA = "setExtraData";
+    private static final String ACTION_GET_PREDICTED_ECPM = "getPredictedEcpm";
 
     private static final String ACTION_SET_AGE = "setAge";
     private static final String ACTION_SET_GENDER = "setGender";
@@ -90,24 +96,31 @@ public class AppodealPlugin extends CordovaPlugin {
     private static final String CALLBACK_SHOWN = "onShown";
     private static final String CALLBACK_CLOSED = "onClosed";
     private static final String CALLBACK_FINISHED = "onFinished";
+    private static final String CALLBACK_EXPIRED = "onExpired";
+
     private CallbackContext interstitialCallbacks;
     private CallbackContext bannerCallbacks;
     private CallbackContext nonSkippableCallbacks;
     private CallbackContext rewardedCallbacks;
 
     @Override
-    public boolean execute(String action, JSONArray args,
-                           final CallbackContext callback) throws JSONException {
+    public boolean execute(String action, JSONArray args, final CallbackContext callback) throws JSONException {
 
         if (action.equals(ACTION_INITIALIZE)) {
             final String appKey = args.getString(0);
             final int adType = args.getInt(1);
-            final boolean consentValue = args.getInt(2);
+            final boolean consentValue = args.optBoolean(2, true); // Same as Appodeal.initialize(@NonNull Activity activity, @NonNull String appKey, int adTypes)
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+                    if("true".equals(Settings.System.getString(cordova.getActivity().getContentResolver(), "firebase.test.lab"))) {
+                        Appodeal.setTesting(true);
+                    }
+                    log("Initializing SDK");
                     Appodeal.initialize(cordova.getActivity(), appKey, getAdType(adType), consentValue);
                     isInitialized = true;
+                    log("SDK initialized");
+                    callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, true));
                 }
             });
             return true;
@@ -115,7 +128,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if(isInitialized) {
+                    if (isInitialized) {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, true));
                     } else {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, false));
@@ -130,9 +143,10 @@ public class AppodealPlugin extends CordovaPlugin {
                 public void run() {
                     int rAdType = getAdType(adType);
                     boolean res;
-                    if(rAdType == Appodeal.BANNER || rAdType == Appodeal.BANNER_BOTTOM || rAdType == Appodeal.BANNER_TOP){
+                    if (rAdType == Appodeal.BANNER || rAdType == Appodeal.BANNER_BOTTOM
+                            || rAdType == Appodeal.BANNER_TOP) {
                         res = showBanner(adType, null);
-                    } else{
+                    } else {
                         res = Appodeal.show(cordova.getActivity(), getAdType(adType));
                     }
                     callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, res));
@@ -146,37 +160,40 @@ public class AppodealPlugin extends CordovaPlugin {
                 @Override
                 public void run() {
                     int rAdType = getAdType(adType);
-                    boolean res =  false;
-                    if(rAdType == Appodeal.BANNER || rAdType == Appodeal.BANNER_BOTTOM || rAdType == Appodeal.BANNER_TOP){
+                    boolean res = false;
+                    if (rAdType == Appodeal.BANNER || rAdType == Appodeal.BANNER_BOTTOM
+                            || rAdType == Appodeal.BANNER_TOP) {
                         res = showBanner(adType, placement);
-                    } else{
+                    } else {
                         res = Appodeal.show(cordova.getActivity(), getAdType(adType), placement);
                     }
                     callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, res));
                 }
             });
             return true;
-        } else if (action.equals(ACTION_SHOW_BANNER_VIEW)) {
-            final int xAxis = args.getInt(0);
-            final int yAxis = args.getInt(1);
-            final String placement = args.getString(2);
-            cordova.getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if(placement != null) {
-                        AppodealUnityBannerView.getInstance().showBannerView(cordova.getActivity(), xAxis, yAxis, placement);
-                    } else {
-                        AppodealUnityBannerView.getInstance().showBannerView(cordova.getActivity(), xAxis, yAxis, "");
-                    }
-                }
-            });
-            return true;
+            // } else if (action.equals(ACTION_SHOW_BANNER_VIEW)) {
+            // final int xAxis = args.getInt(0);
+            // final int yAxis = args.getInt(1);
+            // final String placement = args.getString(2);
+            // cordova.getActivity().runOnUiThread(new Runnable() {
+            // @Override
+            // public void run() {
+            // if(placement != null) {
+            // AppodealUnityBannerView.getInstance().showBannerView(cordova.getActivity(),
+            // xAxis, yAxis, placement);
+            // } else {
+            // AppodealUnityBannerView.getInstance().showBannerView(cordova.getActivity(),
+            // xAxis, yAxis, "");
+            // }
+            // }
+            // });
+            // return true;
         } else if (action.equals(ACTION_IS_LOADED)) {
             final int adType = args.getInt(0);
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if(Appodeal.isLoaded(getAdType(adType))) {
+                    if (Appodeal.isLoaded(getAdType(adType))) {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, true));
                     } else {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, false));
@@ -199,20 +216,20 @@ public class AppodealPlugin extends CordovaPlugin {
                 @Override
                 public void run() {
                     Appodeal.hide(cordova.getActivity(), getAdType(adType));
-                    AppodealUnityBannerView.getInstance().hideBannerView(cordova.getActivity());
+                    // AppodealUnityBannerView.getInstance().hideBannerView(cordova.getActivity());
                 }
             });
             return true;
-        } else if(action.equals(ACTION_DESTROY)){
-			final int adType = args.getInt(0);
-			cordova.getActivity().runOnUiThread(new Runnable() {
+        } else if (action.equals(ACTION_DESTROY)) {
+            final int adType = args.getInt(0);
+            cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-					Appodeal.destroy(adType);
-				}
-			});
-			return true;
-		} else if (action.equals(ACTION_SET_AUTO_CACHE)) {
+                    Appodeal.destroy(adType);
+                }
+            });
+            return true;
+        } else if (action.equals(ACTION_SET_AUTO_CACHE)) {
             final int adType = args.getInt(0);
             final boolean autoCache = args.getBoolean(1);
             cordova.getActivity().runOnUiThread(new Runnable() {
@@ -227,7 +244,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if(Appodeal.isPrecache(getAdType(adType))) {
+                    if (Appodeal.isPrecache(getAdType(adType))) {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, true));
                     } else {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, false));
@@ -249,7 +266,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    //Appodeal.setBannerBackground(value);
+                    // Appodeal.setBannerBackground(value);
                 }
             });
             return true;
@@ -271,7 +288,7 @@ public class AppodealPlugin extends CordovaPlugin {
                 }
             });
             return true;
-        } else if(action.equals(ACTION_BANNERS_OVERLAP)) {
+        } else if (action.equals(ACTION_BANNERS_OVERLAP)) {
             final boolean value = args.getBoolean(0);
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
@@ -295,18 +312,18 @@ public class AppodealPlugin extends CordovaPlugin {
                 @Override
                 public void run() {
                     switch (logLevel) {
-                        case 0:
-                            Appodeal.setLogLevel(Log.LogLevel.none);
-                            break;
-                        case 1:
-                            Appodeal.setLogLevel(Log.LogLevel.debug);
-                            break;
-                        case 2:
-                            Appodeal.setLogLevel(Log.LogLevel.verbose);
-                            break;
-                        default:
-                            Appodeal.setLogLevel(Log.LogLevel.none);
-                            break;
+                    case 0:
+                        Appodeal.setLogLevel(Log.LogLevel.none);
+                        break;
+                    case 1:
+                        Appodeal.setLogLevel(Log.LogLevel.debug);
+                        break;
+                    case 2:
+                        Appodeal.setLogLevel(Log.LogLevel.verbose);
+                        break;
+                    default:
+                        Appodeal.setLogLevel(Log.LogLevel.none);
+                        break;
                     }
                 }
             });
@@ -382,12 +399,12 @@ public class AppodealPlugin extends CordovaPlugin {
                 }
             });
             return true;
-        } else if(action.equals(ACTION_SET_PLUGIN_VERSION)){
+        } else if (action.equals(ACTION_SET_PLUGIN_VERSION)) {
             final String pluginVersion = args.getString(0);
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
-                public void run(){
-                    Appodeal.setFramework("cordova", pluginVersion, false, false);
+                public void run() {
+                    Appodeal.setFramework("cordova", pluginVersion, null, false, false);
                 }
             });
             return true;
@@ -404,7 +421,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if(Appodeal.canShow(getAdType(adType))) {
+                    if (Appodeal.canShow(getAdType(adType))) {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, true));
                     } else {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, false));
@@ -418,7 +435,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if(Appodeal.canShow(getAdType(adType), placement)) {
+                    if (Appodeal.canShow(getAdType(adType), placement)) {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, true));
                     } else {
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, false));
@@ -432,7 +449,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    Appodeal.setCustomRule(name, value);
+                    Appodeal.setExtraData(name, value);
                 }
             });
             return true;
@@ -442,7 +459,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    Appodeal.setCustomRule(name, value);
+                    Appodeal.setExtraData(name, value);
                 }
             });
             return true;
@@ -452,7 +469,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    Appodeal.setCustomRule(name, value);
+                    Appodeal.setExtraData(name, value);
                 }
             });
             return true;
@@ -462,7 +479,36 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    Appodeal.setCustomRule(name, value);
+                    Appodeal.setExtraData(name, value);
+                }
+            });
+            return true;
+        } else if (action.equals(ACTION_SET_SEGMENT_FILTER)) {
+            final String name = args.getString(0);
+            final String value = args.getString(1);
+            cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Appodeal.setSegmentFilter(name, value);
+                }
+            });
+            return true;
+        } else if (action.equals(ACTION_SET_EXTRA_DATA)) {
+            final String name = args.getString(0);
+            final String value = args.getString(1);
+            cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Appodeal.setExtraData(name, value);
+                }
+            });
+            return true;
+        } else if (action.equals(ACTION_GET_PREDICTED_ECPM)) {
+            final int adType = args.getInt(0);
+            cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, (float) Appodeal.getPredictedEcpm(adType)));
                 }
             });
             return true;
@@ -470,12 +516,13 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("amount", Appodeal.getRewardParameters().first);
                         vals.put("currency", Appodeal.getRewardParameters().second);
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, vals));
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
             return true;
@@ -484,12 +531,13 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("amount", Appodeal.getRewardParameters(placement).first);
                         vals.put("currency", Appodeal.getRewardParameters(placement).second);
                         callback.sendPluginResult(new PluginResult(PluginResult.Status.OK, vals));
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
             return true;
@@ -507,17 +555,17 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    if(gender.equals("other".toLowerCase())) {
+                    if (gender.equals("other".toLowerCase())) {
                         getUserSettings().setGender(UserSettings.Gender.OTHER);
-                    } else if(gender.equals("female".toLowerCase())) {
+                    } else if (gender.equals("female".toLowerCase())) {
                         getUserSettings().setGender(UserSettings.Gender.FEMALE);
-                    } else if(gender.equals("male".toLowerCase())) {
+                    } else if (gender.equals("male".toLowerCase())) {
                         getUserSettings().setGender(UserSettings.Gender.MALE);
                     }
                 }
             });
             return true;
-        } else if(action.equals(ACTION_SET_USER_ID)) {
+        } else if (action.equals(ACTION_SET_USER_ID)) {
             final String userId = args.getString(0);
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
@@ -530,7 +578,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         interstitialCallbacks = callback;
                         Appodeal.setInterstitialCallbacks(interstitialListener);
                         JSONObject vals = new JSONObject();
@@ -538,7 +586,8 @@ public class AppodealPlugin extends CordovaPlugin {
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         callback.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
             return true;
@@ -546,7 +595,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         nonSkippableCallbacks = callback;
                         Appodeal.setNonSkippableVideoCallbacks(nonSkippableVideoListener);
                         JSONObject vals = new JSONObject();
@@ -554,7 +603,8 @@ public class AppodealPlugin extends CordovaPlugin {
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         callback.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
             return true;
@@ -562,7 +612,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         rewardedCallbacks = callback;
                         Appodeal.setRewardedVideoCallbacks(rewardedVideoListener);
                         JSONObject vals = new JSONObject();
@@ -570,7 +620,8 @@ public class AppodealPlugin extends CordovaPlugin {
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         callback.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
             return true;
@@ -596,7 +647,7 @@ public class AppodealPlugin extends CordovaPlugin {
     }
 
     private UserSettings getUserSettings() {
-        if(userSettings == null) {
+        if (userSettings == null) {
             userSettings = Appodeal.getUserSettings(cordova.getActivity());
         }
         return userSettings;
@@ -604,22 +655,22 @@ public class AppodealPlugin extends CordovaPlugin {
 
     private int getAdType(int adtype) {
         int type = 0;
-        if((adtype & 3) > 0) {
+        if ((adtype & 3) > 0) {
             type |= Appodeal.INTERSTITIAL;
         }
-        if((adtype & 4) > 0) {
+        if ((adtype & 4) > 0) {
             type |= Appodeal.BANNER;
         }
-        if((adtype & 8) > 0) {
+        if ((adtype & 8) > 0) {
             type |= Appodeal.BANNER_BOTTOM;
         }
-        if((adtype & 16) > 0) {
+        if ((adtype & 16) > 0) {
             type |= Appodeal.BANNER_TOP;
         }
-        if((adtype & 128) > 0) {
+        if ((adtype & 128) > 0) {
             type |= Appodeal.REWARDED_VIDEO;
         }
-        if((adtype & 256) > 0) {
+        if ((adtype & 256) > 0) {
             type |= Appodeal.NON_SKIPPABLE_VIDEO;
         }
         return type;
@@ -632,13 +683,14 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_SHOWN);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         interstitialCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -648,14 +700,15 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_LOADED);
                         vals.put("isPrecache", arg0);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         interstitialCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -665,13 +718,14 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_FAILED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         interstitialCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -681,13 +735,31 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_CLOSED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         interstitialCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void onInterstitialExpired() {
+            cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        JSONObject vals = new JSONObject();
+                        vals.put("event", CALLBACK_EXPIRED);
+                        PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
+                        result.setKeepCallback(true);
+                        interstitialCallbacks.sendPluginResult(result);
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -697,13 +769,14 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_CLICKED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         interstitialCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -716,14 +789,32 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_CLOSED);
                         vals.put("finished", finished);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         nonSkippableCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void onNonSkippableVideoExpired() {
+            cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        JSONObject vals = new JSONObject();
+                        vals.put("event", CALLBACK_EXPIRED);
+                        PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
+                        result.setKeepCallback(true);
+                        nonSkippableCallbacks.sendPluginResult(result);
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -733,13 +824,14 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_FAILED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         nonSkippableCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -749,29 +841,31 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_FINISHED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         nonSkippableCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
 
         @Override
-        public void onNonSkippableVideoLoaded() {
+        public void onNonSkippableVideoLoaded(boolean loaded) {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_LOADED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         nonSkippableCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -781,13 +875,14 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_SHOWN);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         nonSkippableCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -797,18 +892,36 @@ public class AppodealPlugin extends CordovaPlugin {
     private RewardedVideoCallbacks rewardedVideoListener = new RewardedVideoCallbacks() {
 
         @Override
-        public void onRewardedVideoClosed(final boolean finished) {
+        public void onRewardedVideoClosed(boolean finished) {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_CLOSED);
                         vals.put("finished", finished);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         rewardedCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void onRewardedVideoExpired() {
+            cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        JSONObject vals = new JSONObject();
+                        vals.put("event", CALLBACK_EXPIRED);
+                        PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
+                        result.setKeepCallback(true);
+                        rewardedCallbacks.sendPluginResult(result);
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -818,23 +931,24 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_FAILED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         rewardedCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
 
         @Override
-        public void onRewardedVideoFinished(final int amount, final String name) {
+        public void onRewardedVideoFinished(double amount, String name) {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_FINISHED);
                         vals.put("amount", amount);
@@ -842,23 +956,25 @@ public class AppodealPlugin extends CordovaPlugin {
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         rewardedCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
 
         @Override
-        public void onRewardedVideoLoaded() {
+        public void onRewardedVideoLoaded(boolean loaded) {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_LOADED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         rewardedCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -868,13 +984,31 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_SHOWN);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         rewardedCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void onRewardedVideoClicked() {
+            cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        JSONObject vals = new JSONObject();
+                        vals.put("event", CALLBACK_CLICKED);
+                        PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
+                        result.setKeepCallback(true);
+                        rewardedCallbacks.sendPluginResult(result);
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -888,13 +1022,31 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_CLICKED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         bannerCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void onBannerExpired() {
+            cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        JSONObject vals = new JSONObject();
+                        vals.put("event", CALLBACK_EXPIRED);
+                        PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
+                        result.setKeepCallback(true);
+                        bannerCallbacks.sendPluginResult(result);
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -904,13 +1056,14 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_FAILED);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         bannerCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -920,7 +1073,7 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_LOADED);
                         vals.put("height", height);
@@ -928,7 +1081,8 @@ public class AppodealPlugin extends CordovaPlugin {
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         bannerCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
@@ -938,55 +1092,66 @@ public class AppodealPlugin extends CordovaPlugin {
             cordova.getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    try{
+                    try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_SHOWN);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         bannerCallbacks.sendPluginResult(result);
-                    } catch(JSONException e){}
+                    } catch (JSONException e) {
+                    }
                 }
             });
         }
 
     };
 
-    private ViewGroup getViewGroup(int child){
-        ViewGroup vg = (ViewGroup) this.cordova.getActivity().getWindow().getDecorView().findViewById(android.R.id.content);
-        if(child != -1) vg = (ViewGroup)vg.getChildAt(child); //child == 0 is view from setContentView
+    private ViewGroup getViewGroup(int child) {
+        ViewGroup vg = (ViewGroup) this.cordova.getActivity().getWindow().getDecorView()
+                .findViewById(android.R.id.content);
+        if (child != -1)
+            vg = (ViewGroup) vg.getChildAt(child); // child == 0 is view from setContentView
         return vg;
     }
 
-    private boolean showBanner(int adType, String placement){
+    private boolean showBanner(int adType, String placement) {
         if (bannerView != null && bannerView.getParent() != null) {
-            ((ViewGroup)bannerView.getParent()).removeView(bannerView);
+            ((ViewGroup) bannerView.getParent()).removeView(bannerView);
         }
-        if (bannerView == null) bannerView = Appodeal.getBannerView(cordova.getActivity());
+        if (bannerView == null)
+            bannerView = Appodeal.getBannerView(cordova.getActivity());
 
-        if (bannerOverlap){
+        if (bannerOverlap) {
             ViewGroup rootView = getViewGroup(-1);
-            if(rootView == null) return false;
-            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-            if(adType == Appodeal.BANNER_TOP) params.gravity = Gravity.TOP  | Gravity.CENTER_HORIZONTAL;
-            else params.gravity = Gravity.BOTTOM  | Gravity.CENTER_HORIZONTAL;
+            if (rootView == null)
+                return false;
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT);
+            if (adType == Appodeal.BANNER_TOP)
+                params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            else
+                params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
             rootView.addView(bannerView, params);
             rootView.requestLayout();
         } else {
             ViewGroup rootView = getViewGroup(0);
-            if(rootView == null) return false;
+            if (rootView == null)
+                return false;
             if (parentView == null) {
                 parentView = new LinearLayout(cordova.getActivity());
             }
             if (rootView != parentView) {
-                ((ViewGroup)rootView.getParent()).removeView(rootView);
+                ((ViewGroup) rootView.getParent()).removeView(rootView);
                 ((LinearLayout) parentView).setOrientation(LinearLayout.VERTICAL);
-                parentView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, 0.0F));
-                rootView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, 1.0F));
+                parentView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT, 0.0F));
+                rootView.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT, 1.0F));
                 parentView.addView(rootView);
                 cordova.getActivity().setContentView(parentView);
             }
 
-            if(adType == Appodeal.BANNER_TOP)
+            if (adType == Appodeal.BANNER_TOP)
                 parentView.addView(bannerView, 0);
             else
                 parentView.addView(bannerView);
@@ -995,9 +1160,17 @@ public class AppodealPlugin extends CordovaPlugin {
             parentView.requestLayout();
         }
         boolean res = false;
-        if(placement == null) res = Appodeal.show(cordova.getActivity(), Appodeal.BANNER_VIEW);
-        else res = Appodeal.show(cordova.getActivity(), Appodeal.BANNER_VIEW, placement);
+        if (placement == null)
+            res = Appodeal.show(cordova.getActivity(), Appodeal.BANNER_VIEW);
+        else
+            res = Appodeal.show(cordova.getActivity(), Appodeal.BANNER_VIEW, placement);
 
         return res;
+    }
+
+    private static void log(String message) {
+        if(Appodeal.getLogLevel().equals(Log.LogLevel.debug) || Appodeal.getLogLevel().equals(Log.LogLevel.verbose)){
+            android.util.Log.d(TAG, message);
+        }
     }
 }
