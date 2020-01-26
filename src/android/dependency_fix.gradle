@@ -15,14 +15,22 @@ configurations.all{
     }
 }
 
+buildscript {
+
 repositories {
     flatDir {
         dirs 'libs'
     }
+    jcenter()
+    google()
 }
 
 dependencies {
+        
+	classpath 'com.android.tools.build:gradle:3.0.1' 
+	
 	// Appodeal SDK
-	classpath fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+	implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
     
+}
 }
