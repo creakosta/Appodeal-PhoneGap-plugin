@@ -256,6 +256,7 @@
 
         <source-file src="src/android/AppodealPlugin.java" target-dir="src/com/appodeal/plugin" />
     	<framework src="src/android/dependency_fix.gradle" custom="true" type="gradleReference" />
+	        <source-file src="libs/Android/facebook-5.5.0.aar" target-dir="libs" />
 		<source-file src="libs/Android/adcolony-4.1.0.jar" target-dir="libs" />
 		<source-file src="libs/Android/appodeal-2.5.10.jar" target-dir="libs" />
 		<source-file src="libs/Android/chartboost-7.3.1.jar" target-dir="libs" />
@@ -270,7 +271,7 @@
 		<source-file src="libs/Android/VNG-moat-mobile-app-kit-2.2.0.jar" target-dir="libs" />
 		<source-file src="libs/Android/vungle-6.3.24.jar" target-dir="libs" />
 	        <framework src="libs/Android/applovin-9.9.2" custom="true" />
-	        <framework src="libs/Android/facebook-5.5.0" custom="true" />
+	        <!-- <framework src="libs/Android/facebook-5.5.0" custom="true" /> -->
 
 	</platform>
 
