@@ -899,7 +899,6 @@ public class AppodealPlugin extends CordovaPlugin {
                     try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_CLOSED);
-                        vals.put("finished", finished);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         rewardedCallbacks.sendPluginResult(result);
@@ -951,8 +950,6 @@ public class AppodealPlugin extends CordovaPlugin {
                     try {
                         JSONObject vals = new JSONObject();
                         vals.put("event", CALLBACK_FINISHED);
-                        vals.put("amount", amount);
-                        vals.put("name", name);
                         PluginResult result = new PluginResult(PluginResult.Status.OK, vals);
                         result.setKeepCallback(true);
                         rewardedCallbacks.sendPluginResult(result);
