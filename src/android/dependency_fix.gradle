@@ -21,8 +21,6 @@ repositories {
     flatDir {
         dirs 'libs'
     }
-    jcenter()
-    google()
 }
 
 dependencies {
