@@ -14,3 +14,15 @@ configurations.all{
 		}
     }
 }
+
+repositories {
+    flatDir {
+        dirs 'libs'
+    }
+}
+
+dependencies {
+	// Appodeal SDK
+	implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+    
+}
