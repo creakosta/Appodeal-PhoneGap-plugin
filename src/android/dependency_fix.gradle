@@ -15,12 +15,14 @@ configurations.all{
     }
 }
 
-buildscript {
-
 repositories {
+    maven {
+		url 'https://maven.google.com'
+	}
     flatDir {
         dirs 'libs'
     }
+    jcenter()
 }
 
 dependencies {
@@ -30,5 +32,4 @@ dependencies {
 	// Appodeal SDK
 	implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
     
-}
 }
