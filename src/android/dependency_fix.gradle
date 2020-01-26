@@ -23,6 +23,6 @@ repositories {
 
 dependencies {
 	// Appodeal SDK
-	implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+	classpath fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
     
 }
