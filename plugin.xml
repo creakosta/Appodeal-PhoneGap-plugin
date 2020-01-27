@@ -252,8 +252,8 @@
 			<!-- End MyTarget -->
 
         </config-file>
-        <framework src="com.google.android.gms:play-services-ads:16.+" />
-	<framework src="com.google.android.gms:play-services-location:16.+" />
+        <framework src="com.google.android.gms:play-services-ads:15.+" />
+	<framework src="com.google.android.gms:play-services-location:15.+" />
 	<framework src="com.android.support:support-v4:26.1.0" />
 	<framework src="com.android.support:recyclerview-v7:26.1.0" />
 
